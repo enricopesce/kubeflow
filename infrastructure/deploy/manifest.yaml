@@ -1,0 +1,237 @@
+apiVersion: v1
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes  1;
+    events {
+      worker_connections  10240;
+    }
+    http {
+      log_format json_http_combined escape=json
+          '{ "@timestamp":"$time_iso8601",'
+            '"server_name":"$server_name",'
+            '"status":$status,'
+            '"bytes_sent":$bytes_sent,'
+            '"body_bytes_sent":$body_bytes_sent,'
+            '"remote_addr":"$remote_addr",'
+            '"request_time":$request_time,'
+            '"request_id":"$request_id",'
+            '"request_length":$request_length,'
+            '"request_method":"$request_method",'
+            '"request_uri":"$request_uri", '
+            '"request_path":"$uri", '
+            '"request_param":"$query_string", '
+            '"request_body":"$request_body", '
+            '"server_addr":"$server_addr",'
+            '"server_port":$server_port,'
+            '"server_protocol":"$server_protocol",'
+            '"ssl_protocol":"$ssl_protocol",'
+            '"ssl_cipher":"$ssl_cipher",'
+            '"ssl_session_id":"$ssl_session_id",'
+            '"http_host":"$http_host",'
+            '"http_referrer":"$http_referer",'
+            '"http_user_agent":"$http_user_agent",'
+            '"http_x_forwarded_for:"$http_x_forwarded_for",'
+            '"upstream_addr":"$upstream_addr",'
+            '"upstream_response_time":$upstream_response_time,'
+            '"upstream_connect_time":$upstream_connect_time }';
+      access_log /dev/stdout json_http_combined;
+      error_log /dev/stdout;
+      include /etc/nginx/virtualhost.conf;
+    }
+  virtualhost.conf: |-
+    map $http_user_agent $logger {
+     default 1;
+     "~kube-probe" 0;
+    }
+    server {
+      listen 80 default_server;
+      server_name _;
+      root /app/public;
+      access_log /dev/stdout json_http_combined if=$logger;
+      error_log /dev/stdout;
+      index index.php;
+      location / {
+          try_files $uri /index.php$is_args$args;
+      }
+      location ~ \.php {
+          try_files $uri =404;
+          fastcgi_split_path_info ^(.+\.php)(/.+)$;
+          include fastcgi_params;
+          fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+          fastcgi_param SCRIPT_NAME $fastcgi_script_name;
+          fastcgi_index index.php;
+          fastcgi_pass 127.0.0.1:9000;
+      }
+    }
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+
+---
+apiVersion: v1
+data:
+  php-fpm.conf: |
+    [global]
+    daemonize = no
+    error_log = /dev/stderr
+    log_level = warning
+    [app]
+    listen = 0.0.0.0:9000
+    access.log = /dev/stdout
+    user = app
+    group = app
+    pm = static
+    pm.max_children = 1
+    catch_workers_output = yes
+    clear_env = no
+    ping.path = /ping
+    pm.status_path = /status
+    slowlog = /dev/stderr
+    catch_workers_output = yes
+    php_admin_value[error_log] = /dev/stderr
+    php_admin_flag[log_errors] = on
+    env[HOSTNAME] = $HOSTNAME
+    env[TMP] = /tmp
+    env[TMPDIR] = /tmp
+    env[TEMP] = /tmp
+  php.ini: |
+    date.timezone=UTC
+    memory_limit = -1
+    error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+    upload_max_filesize = 20M
+    post_max_size = 20M
+    log_errors_max_len = 8192
+kind: ConfigMap
+metadata:
+  name: php-conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubeflow
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: kubeflow
+  type: NodePort
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: kubeflow
+  name: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubeflow
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: kubeflow
+    spec:
+      containers:
+      - image: ghcr.io/enricopesce/kubeflow-app:bde5bcfd
+        name: app
+        ports:
+        - containerPort: 9000
+          name: fcgi
+        resources:
+          limits:
+            cpu: "0.5"
+          requests:
+            cpu: "0.5"
+        volumeMounts:
+        - mountPath: /usr/local/etc/php-fpm.conf
+          name: php-volume
+          readOnly: true
+          subPath: php-fpm.conf
+        - mountPath: /usr/local/etc/php/php.ini
+          name: php-volume
+          readOnly: true
+          subPath: php.ini
+      - image: ghcr.io/enricopesce/kubeflow-web:bde5bcfd
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        name: web
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          limits:
+            cpu: "0.5"
+          requests:
+            cpu: "0.5"
+        volumeMounts:
+        - mountPath: /etc/nginx/nginx.conf
+          name: nginx-volume
+          readOnly: true
+          subPath: nginx.conf
+        - mountPath: /etc/nginx/virtualhost.conf
+          name: nginx-volume
+          readOnly: true
+          subPath: virtualhost.conf
+      volumes:
+      - configMap:
+          name: nginx-conf
+        name: nginx-volume
+      - configMap:
+          name: php-conf
+        name: php-volume
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kubeflow
+spec:
+  maxReplicas: 10
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 50
+        type: Utilization
+    type: Resource
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubeflow
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  name: kubeflow
+spec:
+  rules:
+  - host: foo.bar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: kubeflow
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+
+---

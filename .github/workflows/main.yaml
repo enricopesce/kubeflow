@@ -1,0 +1,75 @@
+name: Release
+on:
+  push:
+    branches:
+      - "*"
+
+jobs:
+  Delivery:
+    runs-on: ubuntu-latest
+
+    permissions: write-all
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit stage
+        run: |
+          echo "Unit test.."
+          echo "Code analisys.."
+
+      - run: curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+      - run: install minikube-linux-amd64 /usr/local/bin/minikube
+      - run: minikube start
+      - run: minikube addons enable metrics-server
+      - run: minikube addons enable ingress
+
+      - name: Build stage
+        run: npm install -g devspace
+      - run: devspace use profile release
+      - run: devspace build
+      - run: devspace render --silent > manifest.yaml
+
+      - name: Acceptance stage
+        run: echo "Acceptance tests..."
+      - run: devspace use namespace kubeflow-test
+      - run: devspace deploy
+      - run: kubectl rollout status deployment.apps/kubeflow
+      - run: kubectl port-forward service/kubeflow 8080:80 &
+      - run: curl http://localhost:8080/hello/enrico
+
+      - name: Delivery stage
+        uses: actions/checkout@master
+        with:
+          repository: enricopesce/kubeflow-deployments
+          token: ${{ secrets.REPO_TOKEN }}
+          path: kubeflow-deployments
+          ref: ${{ github.ref }}
+          
+      - run: |
+          cp manifest.yaml kubeflow-deployments/
+          cd kubeflow-deployments
+          git config user.email "bot@example.com"
+          git config user.name "Deployer Bot"
+          git add manifest.yaml
+          git commit -m "Released version ${GITHUB_SHA}"
+          git push
+
+      # - uses: ad-m/github-push-action@master
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     branch: ${{ github.ref }}
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3

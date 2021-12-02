@@ -1,0 +1,8 @@
+vendor
+.devspace
+.github
+infrastructure
+.git
+.gitignore
+devspace.yaml
+README.md

@@ -1,0 +1,106 @@
+version: v1beta11
+
+images:
+  web:
+    image: ghcr.io/enricopesce/kubeflow-web
+    dockerfile: docker/web/Dockerfile
+    context: ./
+    createPullSecret: true
+    build:
+      buildKit:
+        args:
+          - "--cache-from"
+          - "ghcr.io/enricopesce/kubeflow-web:cache"
+          - "--build-arg"
+          - "BUILDKIT_INLINE_CACHE=1"
+
+  app:
+    image: ghcr.io/enricopesce/kubeflow-app
+    dockerfile: docker/app/Dockerfile
+    context: ./
+    createPullSecret: true
+    build:
+      buildKit:
+        args:
+          - "--cache-from"
+          - "ghcr.io/enricopesce/kubeflow-app:cache"
+          - "--build-arg"
+          - "BUILDKIT_INLINE_CACHE=1"
+        options:
+          target: dev
+
+deployments:
+  - name: kubeflow
+    kubectl:
+      kustomize: true
+      manifests:
+        - infrastructure/kustomize/overlays/dev/
+
+dev:
+  ports:
+    - imageSelector: ghcr.io/enricopesce/kubeflow-web
+      forward:
+        - port: 8080
+          remotePort: 80
+
+  open:
+    - url: http://localhost:8080/hello/enrico
+
+  terminal:
+    imageSelector: ghcr.io/enricopesce/kubeflow-app
+
+  sync:
+    - imageSelector: ghcr.io/enricopesce/kubeflow-app
+      containerPath: /app
+      excludePaths: # paths that should not be synchronized between the local filesystem and the remote container filesystem
+        - .git/
+      uploadExcludePaths: # only be synchronized from the container to the local filesystem
+        - composer.json
+        - composer.lock
+        - vendor/
+
+commands:
+  - name: composer
+    description: Entry point for composer commands.
+    command: devspace enter -c app -- composer $@
+
+profiles:
+  - name: release
+    merge:
+      images:
+        web:
+          tags:
+            - ${DEVSPACE_GIT_COMMIT}
+            - cache
+        app:
+          tags:
+            - ${DEVSPACE_GIT_COMMIT}
+            - cache
+      deployments:
+        - name: kubeflow
+          kubectl:
+            kustomize: true
+            manifests:
+              - infrastructure/kustomize/overlays/release/
+    patches:
+      - op: replace
+        path: images.app.build.docker.options.target
+        value: release
+      - op: replace
+        path: images.web.build.docker.options.target
+        value: release
+  - name: test
+    merge:
+      deployments:
+        - name: kubeflow
+          kubectl:
+            kustomize: true
+            manifests:
+              - infrastructure/kustomize/overlays/dev/
+    patches:
+      - op: replace
+        path: images.app.build.docker.options.target
+        value: release
+      - op: replace
+        path: images.web.build.docker.options.target
+        value: release

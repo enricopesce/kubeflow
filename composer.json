@@ -1,0 +1,12 @@
+{
+    "require": {
+        "slim/slim": "^4.9",
+        "slim/psr7": "^1.5",
+        "zircote/swagger-php": "^3.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Tools\\": "src"
+        }
+    }
+}
