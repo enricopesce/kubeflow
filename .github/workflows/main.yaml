@@ -62,13 +62,8 @@ jobs:
           git config user.email "bot@example.com"
           git config user.name "Deployer Bot"
           git add manifest.yaml
-          git commit -m "Released version ${GITHUB_SHA}"
+          git commit -m "Released version enricopesce/kubeflow#${GITHUB_SHA}"
           git push
-
-      # - uses: ad-m/github-push-action@master
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     branch: ${{ github.ref }}
 
       - name: Setup tmate session
         if: ${{ failure() }}
