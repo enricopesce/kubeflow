@@ -43,7 +43,7 @@ jobs:
 
       - name: Acceptance stage
         run: echo "Acceptance tests..."
-      - run: devspace deploy
+      - run: devspace deploy --skip-build
       - run: kubectl rollout status deployment.apps/kubeflow
       - run: kubectl port-forward service/kubeflow 8080:80 &
       - run: curl http://localhost:8080/hello/enrico
