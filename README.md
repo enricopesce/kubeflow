@@ -31,10 +31,17 @@ Now you can launch commands inside the pod es:
 
 an you can develop with your preferred IDE.
 
+## Tests with non development without CD
+
+If you need to test K8s modifications or new features you can work with the development mode or you can launch the release environment locally or remotely without ArgoCD or CI\CD and a git trigger.
+
+    devspace use profile release
+    devspace use namespace kubeflow-relese
+    devspace deploy
+
 ## Cleanup dev resources
 
     devspace purge
-
 
 ### ArgoCD setup
 

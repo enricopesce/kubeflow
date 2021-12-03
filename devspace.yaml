@@ -70,11 +70,11 @@ profiles:
       images:
         web:
           tags:
-            - ${DEVSPACE_GIT_COMMIT}
+            - ${DEVSPACE_GIT_COMMIT}-${DEVSPACE_TIMESTAMP}
             - cache
         app:
           tags:
-            - ${DEVSPACE_GIT_COMMIT}
+            - ${DEVSPACE_GIT_COMMIT}-${DEVSPACE_TIMESTAMP}
             - cache
       deployments:
         - name: kubeflow
