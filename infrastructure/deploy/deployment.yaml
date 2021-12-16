@@ -142,7 +142,7 @@ spec:
         app: kubeflow
     spec:
       containers:
-      - image: ghcr.io/enricopesce/kubeflow-app:9f446de4-1639671621
+      - image: ghcr.io/enricopesce/kubeflow-app:8e74e313-1639671885
         name: app
         ports:
         - containerPort: 9000
@@ -161,7 +161,7 @@ spec:
           name: php-volume
           readOnly: true
           subPath: php.ini
-      - image: ghcr.io/enricopesce/kubeflow-web:9f446de4-1639671621
+      - image: ghcr.io/enricopesce/kubeflow-web:8e74e313-1639671885
         livenessProbe:
           httpGet:
             path: /
