@@ -8,8 +8,6 @@ jobs:
   Delivery:
     runs-on: ubuntu-latest
 
-    permissions: write-all
-
     steps:
       - uses: actions/checkout@v2
 
@@ -25,8 +23,8 @@ jobs:
 
       - name: Commit stage
         run: |
+          echo "Code analisys and linters.."
           echo "Unit test.."
-          echo "Code analisys.."
 
       - run: curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
       - run: install minikube-linux-amd64 /usr/local/bin/minikube
