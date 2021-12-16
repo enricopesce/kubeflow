@@ -10,6 +10,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -37,7 +39,7 @@ jobs:
       - run: devspace use profile release
       - run: devspace use namespace release
       - run: devspace build
-      - run: devspace render --silent > manifest.yaml
+      - run: devspace render --silent > infrastructure/deploy/deployment.yaml
 
       - name: Acceptance stage
         run: echo "Acceptance tests..."
@@ -45,23 +47,18 @@ jobs:
       - run: kubectl rollout status deployment.apps/kubeflow
       - run: kubectl port-forward service/kubeflow 8080:80 &
       - run: curl http://localhost:8080/hello/enrico
-
-      - name: Delivery stage
-        uses: actions/checkout@master
-        with:
-          repository: enricopesce/kubeflow-deployments
-          token: ${{ secrets.REPO_TOKEN }}
-          path: kubeflow-deployments
-          ref: ${{ github.ref }}
           
       - run: |
-          cp manifest.yaml kubeflow-deployments/
-          cd kubeflow-deployments
           git config user.email "bot@example.com"
           git config user.name "Deployer Bot"
-          git add manifest.yaml
+          git add infrastructure/deploy/deployment.yaml
           git commit -m "Released version enricopesce/kubeflow#${GITHUB_SHA}"
-          git push
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
 
       - name: Setup tmate session
         if: ${{ failure() }}

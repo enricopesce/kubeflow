@@ -5,11 +5,11 @@ This project is a lab for understanding how I can setup a complete workflow from
 3) identical infrastructure at every stage
 4) continuos deployment
 
-## Install Kubernetes and friends (for mac users)
+## Install Kubernetes and other requirements
 
-To start you need to prepare a local kubernetes setup with Minikube and Devspace:
+To start you need to prepare a local kubernetes setup with Minikube and Devspace: 
 
-    brew install minikube hyperkit devspace
+    brew install minikube hyperkit devspace (Mac Os)
     minikube start --driver=hyperkit
     minikube addons enable metrics-server
     minikube addons enable ingress
