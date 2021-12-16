@@ -60,13 +60,10 @@ Now you can test and monitor the deployments with http://localhost:8090
 
 ### ArgoCD adding application deployment
 
-Define the ArgoCD application, the production environment is based on the branch:
+Define the ArgoCD application
 
-    kubectl apply -n argocd -f infrastructure/argocd/prd.yaml
+    kubectl apply -n argocd -f app.yaml
 
-also if you need staging:
-
-    kubectl apply -n argocd -f infrastructure/argocd/stg.yaml
 
 ## Cleanup all
 

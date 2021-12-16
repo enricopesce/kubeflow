@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeflow
+  namespace: argocd
+spec:
+  destination:
+    namespace: 'kubeflow'
+    server: 'https://kubernetes.default.svc'
+  source:
+    repoURL: 'https://github.com/enricopesce/kubeflow-deployments'
+    targetRevision: main
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
